@@ -1,0 +1,19 @@
+[app]
+title = VPN Bridge
+package.name = vpnbridge
+package.domain = org.custom
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+version = 1.0
+requirements = python3,kivy
+orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK
+android.api = 33
+android.minapi = 21
+android.archs = arm64-v8a, armeabi-v7a
+android.allow_backup = True
+log_level = 2
+warn_on_root = 1
+osx.python_version = 3
+osx.kivy_version = 1.9.1
