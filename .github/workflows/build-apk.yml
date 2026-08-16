@@ -11,19 +11,18 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build APK with Buildozer
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Set up Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -33,37 +32,64 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
-            zip \
-            unzip \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libtinfo6 \
-            cmake \
-            libffi-dev \
-            libssl-dev \
-            build-essential \
-            ccache \
-            libltdl-dev
+            git zip unzip wget \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev \
+            build-essential ccache libltdl-dev
 
-      - name: Install Python dependencies
+      - name: Install Buildozer
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install "Cython<3.0" buildozer
+          python -m pip install buildozer "Cython<3"
 
-      - name: Build debug APK
+      - name: Prepare Android SDK
         run: |
-          buildozer -v android debug
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+
+          mkdir -p "$SDK/licenses"
+          printf '%s\n' \
+            8933bad161af4178b1185d1a37fbf41ea5269c55 \
+            d56f5187479451eabf01fb78af6dfcb131a6481e \
+            24333f8a63b6825ea9c5514f83c2829b004d1fee \
+            > "$SDK/licenses/android-sdk-license"
+
+          if [ -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          elif [ -x "$SDK/tools/bin/sdkmanager" ]; then
+            SDKMANAGER="$SDK/tools/bin/sdkmanager"
+          else
+            SDKMANAGER="$(find "$SDK" -type f -name sdkmanager -print -quit)"
+          fi
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager پیدا نشد؛ Buildozer باید ابتدا SDK را دانلود کند."
+          else
+            yes | "$SDKMANAGER" --licenses || true
+            "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          fi
+
+      - name: Configure Buildozer
+        run: |
+          test -f buildozer.spec
+          grep -q '^android.accept_sdk_license' buildozer.spec || \
+            sed -i '/^\[app\]/a android.accept_sdk_license = True' buildozer.spec
+
+      - name: Build APK
+        run: |
+          buildozer android clean
+          yes | buildozer -v android debug
+
+      - name: Show generated files
+        if: always()
+        run: |
+          find . -type f \( -name "*.apk" -o -name "*.aab" \) -print
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: vpnbridge-apk
           path: bin/*.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
